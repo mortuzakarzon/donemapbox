@@ -135,6 +135,23 @@ const MapboxExample = () => {
     // Event listener for line updates (dragging)
     mapRef.current.on("draw.update", (e) => {
       if (e.features[0].geometry.type === "LineString") {
+        const coordinates = e.features[0].geometry.coordinates;
+
+        // Restrict line to only two points during edit
+        if (coordinates.length > 2) {
+          const truncatedLine = {
+            ...e.features[0],
+            geometry: {
+              ...e.features[0].geometry,
+              coordinates: coordinates.slice(0, 2), // Ensure only two points remain
+            },
+          };
+
+          // Replace the original line with the truncated one
+          drawRef.current.delete(e.features[0].id);
+          drawRef.current.add(truncatedLine);
+        }
+
         updateArrowLayer(e.features[0]);
       }
     });
