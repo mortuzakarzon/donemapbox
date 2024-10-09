@@ -128,7 +128,14 @@ const MapboxExample = () => {
           drawRef.current.add(truncatedLine);
         }
 
-        addArrowLayer(e.features[0]);
+        updateArrowLayer(e.features[0]);
+      }
+    });
+
+    // Event listener for line updates (dragging)
+    mapRef.current.on("draw.update", (e) => {
+      if (e.features[0].geometry.type === "LineString") {
+        updateArrowLayer(e.features[0]);
       }
     });
 
@@ -137,8 +144,8 @@ const MapboxExample = () => {
     };
   }, []);
 
-  // Function to add arrow layer at the midpoint of the LineString
-  const addArrowLayer = (lineFeature) => {
+  // Function to add or update arrow layer
+  const updateArrowLayer = (lineFeature) => {
     const coordinates = lineFeature.geometry.coordinates;
 
     if (coordinates.length < 2) return;
@@ -153,54 +160,69 @@ const MapboxExample = () => {
     // Calculate the bearing using Turf.js
     const bearing = turf.bearing(turf.point(start), turf.point(end));
 
-    const url = "images/arrow.png"; // Replace with the correct image path
-    mapRef.current.loadImage(url, (err, image) => {
-      if (err) {
-        console.error("Error loading arrow image:", err);
-        return;
-      }
+    const arrowLayerId = `arrow-${lineFeature.id}`;
 
-      if (!mapRef.current.hasImage("arrow")) {
-        mapRef.current.addImage("arrow", image); // Only add the image once
-      }
-
-      // Remove existing arrow layer if it exists for this line
-      const arrowLayerId = `arrow-${lineFeature.id}`;
-      if (mapRef.current.getLayer(arrowLayerId)) {
-        mapRef.current.removeLayer(arrowLayerId);
-        mapRef.current.removeSource(arrowLayerId);
-      }
-
-      // Add arrow symbol at the midpoint with rotation using the bearing
-      mapRef.current.addLayer({
-        id: arrowLayerId, // Unique ID for each line
-        type: "symbol",
-        source: {
-          type: "geojson",
-          data: {
-            type: "FeatureCollection",
-            features: [
-              {
-                type: "Feature",
-                geometry: {
-                  type: "Point",
-                  coordinates: midpoint,
-                },
-                properties: {
-                  rotation: bearing + 275, // Use bearing for rotation
-                },
-              },
-            ],
+    // Check if the arrow layer exists
+    if (mapRef.current.getLayer(arrowLayerId)) {
+      // Update the arrow layer's source with the new midpoint and bearing
+      mapRef.current.getSource(arrowLayerId).setData({
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: midpoint,
+            },
+            properties: {
+              rotation: bearing + 275, // Use bearing for rotation
+            },
           },
-        },
-        layout: {
-          "icon-image": "arrow",
-          "icon-size": 0.045,
-          "icon-rotate": ["get", "rotation"], // Rotate the arrow using the bearing
-          "icon-allow-overlap": true,
-        },
+        ],
       });
-    });
+    } else {
+      // Add arrow symbol at the midpoint if it doesn't exist
+      const url = "images/arrow.png"; // Replace with the correct image path
+      mapRef.current.loadImage(url, (err, image) => {
+        if (err) {
+          console.error("Error loading arrow image:", err);
+          return;
+        }
+
+        if (!mapRef.current.hasImage("arrow")) {
+          mapRef.current.addImage("arrow", image); // Only add the image once
+        }
+
+        mapRef.current.addLayer({
+          id: arrowLayerId, // Unique ID for each line
+          type: "symbol",
+          source: {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [
+                {
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: midpoint,
+                  },
+                  properties: {
+                    rotation: bearing + 275, // Use bearing for rotation
+                  },
+                },
+              ],
+            },
+          },
+          layout: {
+            "icon-image": "arrow",
+            "icon-size": 0.045,
+            "icon-rotate": ["get", "rotation"], // Rotate the arrow using the bearing
+            "icon-allow-overlap": true,
+          },
+        });
+      });
+    }
   };
 
   const handleOk = () => {
